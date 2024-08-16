@@ -6,6 +6,7 @@ use crate::errors::ParseError;
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(u32)]
 pub enum Operation {
+    HandShake = 0,
     HeartBeat = 2,
     HeartBeatResponse = 3,
     Notification = 5,
@@ -34,8 +35,9 @@ impl From<u32> for Operation {
 #[repr(u16)]
 pub enum Protocol {
     Json = 0,
-    Int32BE = 1,
+    Heartbeat = 1,
     Zlib = 2,
+    Brotli = 3,
 }
 
 impl TryFrom<u16> for Protocol {
@@ -44,8 +46,9 @@ impl TryFrom<u16> for Protocol {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
             0 => Ok(Self::Json),
-            1 => Ok(Self::Int32BE),
+            1 => Ok(Self::Heartbeat),
             2 => Ok(Self::Zlib),
+            3 => Ok(Self::Brotli),
             _ => Err(ParseError::UnknownProtocol),
         }
     }

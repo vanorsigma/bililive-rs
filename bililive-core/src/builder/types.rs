@@ -12,7 +12,7 @@ impl Resp<ConfQueryInner> {
     }
     pub fn servers(&self) -> Vec<String> {
         self.data
-            .host_server_list
+            .host_list
             .iter()
             .map(|server| format!("wss://{}:{}/sub", server.host, server.wss_port))
             .collect()
@@ -41,7 +41,7 @@ pub struct RoomQueryInner {
 #[derive(Clone, Eq, PartialEq, Deserialize, Hash)]
 pub struct ConfQueryInner {
     token: String,
-    host_server_list: Vec<WSServer>,
+    host_list: Vec<WSServer>,
 }
 
 #[derive(Clone, Eq, PartialEq, Deserialize, Hash)]

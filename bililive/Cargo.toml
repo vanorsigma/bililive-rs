@@ -13,7 +13,7 @@ readme = "README.md"
 all-features = true
 
 [features]
-default = ["tokio-native-tls"]
+default = ["tokio-native-tls", "reqwest/cookies"]
 tokio-native-tls = ["tokio", "async-tungstenite/tokio-native-tls", "reqwest/native-tls", "stream-reconnect/tokio", "bililive-core/tokio"]
 tokio-rustls-webpki-roots = ["tokio", "async-tungstenite/tokio-rustls-webpki-roots", "reqwest/rustls-tls-webpki-roots", "stream-reconnect/tokio", "bililive-core/tokio"]
 tokio-rustls-native-certs = ["tokio", "async-tungstenite/tokio-rustls-native-certs", "reqwest/rustls-tls-native-roots", "stream-reconnect/tokio", "bililive-core/tokio"]

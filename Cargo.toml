@@ -1,2 +1,3 @@
 [workspace]
-members = ["actix-bililive", "bililive", "bililive-core"]
+members = ["bililive", "bililive-core"]
+resolver = "2"

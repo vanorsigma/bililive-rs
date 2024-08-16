@@ -3,6 +3,7 @@
 use std::convert::TryInto;
 use std::io::{Cursor, Read, Write};
 
+use brotli_decompressor::{BrotliDecompress, Decompressor};
 use flate2::read::ZlibDecoder;
 use flate2::write::ZlibEncoder;
 use flate2::Compression;
@@ -98,12 +99,13 @@ impl Packet {
             Operation::RoomEnter,
             Protocol::Json,
             serde_json::to_vec(&json!({
-                "uid": config.uid(),
+                // TODO: this UID was originally config.uid() which is definitely wrong
+                "uid": 0,
                 "roomid": config.room_id(),
-                "protover": 2,
+                "protover": 3,
                 "platform": "web",
-                "clientver": "1.8.2",
                 "type": 2,
+                "buvid": config.buvid(),
                 "key": config.token()
             }))
             .unwrap(),
@@ -182,32 +184,35 @@ impl Packet {
     /// Parse the packet received from Bilibili server.
     #[must_use]
     pub fn parse(input: &[u8]) -> IncompleteResult<(&[u8], Self)> {
-        match parser::parse(input) {
-            Ok((input, packet)) => {
-                if packet.protocol_version == Protocol::Zlib {
-                    let mut z = ZlibDecoder::new(Cursor::new(packet.data));
-                    let mut buf = Vec::new();
-                    if let Err(e) = z.read_to_end(&mut buf) {
-                        return IncompleteResult::Err(ParseError::ZlibError(e));
-                    }
-
-                    match parser::parse(&buf) {
-                        Ok((_, packet)) => IncompleteResult::Ok((input, packet)),
-                        Err(Err::Incomplete(needed)) => {
-                            IncompleteResult::Err(ParseError::PacketError(format!(
-                                "incomplete buffer: {:?} needed",
-                                needed
-                            )))
-                        }
-                        Err(Err::Error(e) | Err::Failure(e)) => {
-                            IncompleteResult::Err(ParseError::PacketError(format!("{:?}", e)))
-                        }
-                    }
-                } else {
-                    IncompleteResult::Ok((input, packet))
+        let mut decompressor: Box<dyn Read> = match parser::parse(input) {
+            Ok((input, packet)) => match packet.protocol_version {
+                Protocol::Zlib => {
+                    Box::new(ZlibDecoder::new(Cursor::new(packet.data)))
                 }
+                Protocol::Brotli => {
+                    Box::new(Decompressor::new(Cursor::new(packet.data), 4096))
+                }
+                _ => return IncompleteResult::Ok((input, packet)),
+            },
+            Err(Err::Incomplete(needed)) => return IncompleteResult::Incomplete(needed),
+            Err(Err::Error(e) | Err::Failure(e)) => {
+                return IncompleteResult::Err(ParseError::PacketError(format!("{:?}", e)))
             }
-            Err(Err::Incomplete(needed)) => IncompleteResult::Incomplete(needed),
+        };
+
+        let mut buf = Vec::new();
+        if let Err(e) = decompressor.read_to_end(&mut buf) {
+            return IncompleteResult::Err(ParseError::ZlibError(e));
+        }
+
+        match parser::parse(&buf) {
+            Ok((_, packet)) => IncompleteResult::Ok((input, packet)),
+            Err(Err::Incomplete(needed)) => {
+                IncompleteResult::Err(ParseError::PacketError(format!(
+                    "incomplete buffer: {:?} needed",
+                    needed
+                )))
+            }
             Err(Err::Error(e) | Err::Failure(e)) => {
                 IncompleteResult::Err(ParseError::PacketError(format!("{:?}", e)))
             }

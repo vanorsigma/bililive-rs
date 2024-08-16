@@ -6,11 +6,12 @@ pub struct StreamConfig(Box<StreamConfigInner>);
 
 impl StreamConfig {
     #[must_use]
-    pub fn new(room_id: u64, uid: u64, token: String, servers: Vec<String>) -> Self {
+    pub fn new(room_id: u64, uid: u64, token: String, buvid: String, servers: Vec<String>) -> Self {
         Self(Box::new(StreamConfigInner {
             room_id,
             uid,
             token,
+            buvid,
             servers,
         }))
     }
@@ -37,6 +38,12 @@ impl StreamConfig {
     pub fn servers(&self) -> &[String] {
         &self.0.servers
     }
+
+    /// BUVID token
+    #[must_use]
+    pub fn buvid(&self) -> &str {
+        &self.0.buvid
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,5 +54,7 @@ struct StreamConfigInner {
     uid: u64,
     /// Danmaku server token.
     token: String,
+    /// Buvid
+    buvid: String,
     servers: Vec<String>,
 }

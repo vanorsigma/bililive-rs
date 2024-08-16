@@ -1,5 +1,6 @@
 //! `bililive` config builder.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
@@ -35,6 +36,20 @@ pub trait Requester {
         &self,
         url: &str,
     ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + '_>>;
+
+    /// Make a `GET` request to the url and try to deserialize the response body as JSON.
+    fn get_json_with_parameters<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        parameters: HashMap<String, String>,
+    ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + '_>>;
+
+    /// Make a `GET` request to the url and try to get a cookie from the response.
+    fn get_cookie(
+        &self,
+        url: String,
+        cookie_name: String,
+    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + '_>>;
 }
 
 /// An abstract HTTP client.
@@ -47,6 +62,20 @@ pub trait Requester: Send + Sync {
         &self,
         url: &str,
     ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + Send + '_>>;
+
+    /// Make a `GET` request to the url and try to deserialize the response body as JSON.
+    fn get_json_with_parameters<T: DeserializeOwned>(
+        &self,
+        url: &str,
+        parameters: HashMap<String, String>,
+    ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + Send + '_>>;
+
+    /// Make a `GET` request to the url and try to get a cookie from the response.
+    fn get_cookie(
+        &self,
+        url: String,
+        cookie_name: String,
+    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + '_>>;
 }
 
 #[doc(hidden)]
@@ -70,6 +99,7 @@ pub struct ConfigBuilder<H, R, U, T, S> {
     room_id: Option<u64>,
     uid: Option<u64>,
     token: Option<String>,
+    buvid: Option<String>,
     servers: Option<Vec<String>>,
     __marker: PhantomData<(R, U, T, S)>,
 }
@@ -93,6 +123,7 @@ impl<H> ConfigBuilder<H, BN, BN, BN, BN> {
             uid: None,
             token: None,
             servers: None,
+            buvid: None,
             __marker: PhantomData,
         }
     }
@@ -107,6 +138,7 @@ impl<H, R, U, T, S> ConfigBuilder<H, R, U, T, S> {
             uid: self.uid,
             token: self.token,
             servers: self.servers,
+            buvid: self.buvid,
             __marker: PhantomData,
         }
     }
@@ -132,6 +164,12 @@ impl<H, R, U, T, S> ConfigBuilder<H, R, U, T, S> {
     #[must_use]
     pub fn servers(mut self, servers: &[String]) -> ConfigBuilder<H, R, U, T, BF> {
         self.servers = Some(servers.to_vec());
+        self.cast()
+    }
+
+    #[must_use]
+    pub fn buvid(mut self, buvid: &str) -> ConfigBuilder<H, R, U, T, BF> {
+        self.buvid = Some(buvid.to_string());
         self.cast()
     }
 }
@@ -169,12 +207,34 @@ where
     /// # Errors
     /// Returns an error when HTTP api request fails.
     pub async fn fetch_conf(mut self) -> Result<ConfigBuilder<H, R, U, BF, BF>, BuildError> {
+        // let resp: Resp<ConfQueryInner> = self
+        //     .http
+        //     .get_json("https://api.live.bilibili.com/room/v1/Danmu/getConf")
+        //     .await
+        //     .map_err(BuildError)?;
+
         let resp: Resp<ConfQueryInner> = self
             .http
-            .get_json("https://api.live.bilibili.com/room/v1/Danmu/getConf")
+            .get_json_with_parameters(
+                "https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo",
+                HashMap::from([
+                    ("id".to_string(), self.room_id.unwrap().to_string()),
+                    ("type".to_string(), "0".to_string()),
+                ]),
+            )
             .await
             .map_err(BuildError)?;
 
+        let resp_buvid = self
+            .http
+            .get_cookie(
+                "https://www.bilibili.com/".to_string(),
+                "buvid3".to_string(),
+            )
+            .await
+            .map_err(BuildError)?;
+
+        self.buvid = Some(resp_buvid);
         self.token = Some(resp.token().to_string());
         self.servers = Some(resp.servers());
         Ok(self.cast())
@@ -190,6 +250,7 @@ impl<H> ConfigBuilder<H, BF, BF, BF, BF> {
             self.room_id.unwrap(),
             self.uid.unwrap(),
             self.token.unwrap(),
+            self.buvid.unwrap(),
             self.servers.unwrap(),
         )
     }

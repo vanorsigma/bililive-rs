@@ -36,5 +36,6 @@ fn must_build_config() {
         .uid(0)
         .servers(&["wss://".to_string()])
         .token("asdf")
+        .buvid("xdd")
         .build();
 }
