@@ -99,8 +99,7 @@ impl Packet {
             Operation::RoomEnter,
             Protocol::Json,
             serde_json::to_vec(&json!({
-                // TODO: this UID was originally config.uid() which is definitely wrong
-                "uid": 0,
+                "uid": config.uid(),
                 "roomid": config.room_id(),
                 "protover": 3,
                 "platform": "web",

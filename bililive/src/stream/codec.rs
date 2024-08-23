@@ -15,8 +15,6 @@ use crate::core::packet::Packet;
 pub struct CodecStream<T> {
     /// underlying tungstenite stream
     stream: T,
-    /// rx buffer
-    read_buffer: Vec<u8>,
 }
 
 impl<T> CodecStream<T> {
@@ -25,8 +23,7 @@ impl<T> CodecStream<T> {
     /// You may want to use `connect` or `connect_with_retry` in [`connect`](crate::connect) module instead.
     pub const fn new(stream: T) -> Self {
         Self {
-            stream,
-            read_buffer: vec![],
+            stream
         }
     }
 }
@@ -45,16 +42,11 @@ where
                     Ok(msg) => {
                         if msg.is_binary() {
                             // append data to the end of the buffer
-                            self.read_buffer.extend(msg.into_data());
+                            let input = msg.into_data();
                             // parse the message
-                            match Packet::parse(&self.read_buffer) {
+                            match Packet::parse(&input) {
                                 IncompleteResult::Ok((remaining, pack)) => {
                                     debug!("packet parsed, {} bytes remaining", remaining.len());
-
-                                    // remove parsed bytes
-                                    let consume_len = self.read_buffer.len() - remaining.len();
-                                    drop(self.read_buffer.drain(..consume_len));
-
                                     return Poll::Ready(Some(Ok(pack)));
                                 }
                                 IncompleteResult::Incomplete(needed) => {

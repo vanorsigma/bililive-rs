@@ -3,7 +3,7 @@ use url::Url;
 
 #[derive(Clone, Eq, PartialEq, Deserialize, Hash)]
 pub struct Resp<T> {
-    data: T,
+    pub data: T,
 }
 
 impl Resp<ConfQueryInner> {
@@ -33,6 +33,12 @@ impl Resp<RoomQueryInner> {
     }
 }
 
+impl Resp<UserIDResponse> {
+    pub fn userid(&self) -> u64 {
+        self.data.mid
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Deserialize, Hash)]
 pub struct RoomQueryInner {
     url: Url,
@@ -48,4 +54,9 @@ pub struct ConfQueryInner {
 struct WSServer {
     host: String,
     wss_port: u16,
+}
+
+#[derive(Clone, Eq, PartialEq, Deserialize, Hash)]
+pub struct UserIDResponse {
+    mid: u64,
 }

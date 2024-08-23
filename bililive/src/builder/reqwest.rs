@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder};
 use serde::de::DeserializeOwned;
 use url::Url;
 
@@ -18,6 +18,14 @@ impl From<Client> for ReqwestClient {
     fn from(client: Client) -> Self {
         Self(client)
     }
+}
+
+fn hashmap_to_cookies_str(cookies: HashMap<String, String>) -> String {
+    cookies
+        .iter()
+        .map(|(key, value)| format!("{key}={value}"))
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 impl Requester for ReqwestClient {
@@ -37,11 +45,20 @@ impl Requester for ReqwestClient {
         &self,
         url: &str,
         parameters: HashMap<String, String>,
+        cookies: HashMap<String, String>,
     ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + Send + '_>> {
         let url = Url::from_str(url).unwrap();
         Box::pin(async move {
             Ok(serde_json::from_slice(
-                &*self.0.get(url).query(&parameters).send().await?.bytes().await?,
+                &*self
+                    .0
+                    .get(url)
+                    .query(&parameters)
+                    .header("Cookie", hashmap_to_cookies_str(cookies))
+                    .send()
+                    .await?
+                    .bytes()
+                    .await?,
             )?)
         })
     }

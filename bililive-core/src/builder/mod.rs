@@ -17,6 +17,7 @@ use std::pin::Pin;
 ///
 /// See docs of downstream crates for details.
 use serde::de::DeserializeOwned;
+use types::UserIDResponse;
 
 use crate::builder::types::{ConfQueryInner, Resp, RoomQueryInner};
 use crate::config::StreamConfig;
@@ -68,6 +69,7 @@ pub trait Requester: Send + Sync {
         &self,
         url: &str,
         parameters: HashMap<String, String>,
+        cookies: HashMap<String, String>,
     ) -> Pin<Box<dyn Future<Output = Result<T, BoxedError>> + Send + '_>>;
 
     /// Make a `GET` request to the url and try to get a cookie from the response.
@@ -101,6 +103,7 @@ pub struct ConfigBuilder<H, R, U, T, S> {
     token: Option<String>,
     buvid: Option<String>,
     servers: Option<Vec<String>>,
+    sess_token: Option<String>,
     __marker: PhantomData<(R, U, T, S)>,
 }
 
@@ -123,6 +126,7 @@ impl<H> ConfigBuilder<H, BN, BN, BN, BN> {
             uid: None,
             token: None,
             servers: None,
+            sess_token: None,
             buvid: None,
             __marker: PhantomData,
         }
@@ -138,6 +142,7 @@ impl<H, R, U, T, S> ConfigBuilder<H, R, U, T, S> {
             uid: self.uid,
             token: self.token,
             servers: self.servers,
+            sess_token: self.sess_token,
             buvid: self.buvid,
             __marker: PhantomData,
         }
@@ -164,6 +169,12 @@ impl<H, R, U, T, S> ConfigBuilder<H, R, U, T, S> {
     #[must_use]
     pub fn servers(mut self, servers: &[String]) -> ConfigBuilder<H, R, U, T, BF> {
         self.servers = Some(servers.to_vec());
+        self.cast()
+    }
+
+    #[must_use]
+    pub fn sess_token(mut self, sess_token: &str) -> ConfigBuilder<H, R, U, BF, S> {
+        self.sess_token = Some(sess_token.to_string());
         self.cast()
     }
 
@@ -207,12 +218,6 @@ where
     /// # Errors
     /// Returns an error when HTTP api request fails.
     pub async fn fetch_conf(mut self) -> Result<ConfigBuilder<H, R, U, BF, BF>, BuildError> {
-        // let resp: Resp<ConfQueryInner> = self
-        //     .http
-        //     .get_json("https://api.live.bilibili.com/room/v1/Danmu/getConf")
-        //     .await
-        //     .map_err(BuildError)?;
-
         let resp: Resp<ConfQueryInner> = self
             .http
             .get_json_with_parameters(
@@ -221,6 +226,12 @@ where
                     ("id".to_string(), self.room_id.unwrap().to_string()),
                     ("type".to_string(), "0".to_string()),
                 ]),
+                match &self.sess_token {
+                    Some(sess_token) => {
+                        HashMap::from([("SESSDATA".to_string(), sess_token.to_string())])
+                    }
+                    None => HashMap::from([]),
+                },
             )
             .await
             .map_err(BuildError)?;
@@ -233,6 +244,24 @@ where
             )
             .await
             .map_err(BuildError)?;
+
+        if let Some(sess_token) = &self.sess_token {
+            let resp_uid: Resp<UserIDResponse> = self
+                .http
+                .get_json_with_parameters(
+                    "https://api.bilibili.com/x/web-interface/nav",
+                    HashMap::default(),
+                    HashMap::from([("SESSDATA".to_string(), sess_token.to_string())]),
+                )
+                .await
+                .map_err(BuildError)?;
+
+            log::info!("help me");
+
+            self.uid = Some(resp_uid.userid());
+        } else {
+            self.uid = Some(0);
+        }
 
         self.buvid = Some(resp_buvid);
         self.token = Some(resp.token().to_string());
