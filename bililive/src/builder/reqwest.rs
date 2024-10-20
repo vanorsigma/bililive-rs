@@ -67,7 +67,7 @@ impl Requester for ReqwestClient {
         &self,
         url: String,
         cookie_name: String,
-    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + '_>> {
+    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + Send + '_>> {
         let url = Url::from_str(url.as_str()).unwrap();
         Box::pin(async move {
             Ok(self

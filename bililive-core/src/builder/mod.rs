@@ -77,7 +77,7 @@ pub trait Requester: Send + Sync {
         &self,
         url: String,
         cookie_name: String,
-    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + '_>>;
+    ) -> Pin<Box<dyn Future<Output = Result<String, BoxedError>> + Send + '_>>;
 }
 
 #[doc(hidden)]
